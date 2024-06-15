@@ -1,84 +1,85 @@
 package main
 
 import (
+	"database/sql"
+	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	_ "github.com/lib/pq"
 )
 
-type Person struct {
-	Name     string `json:"name"`
-	Address  string `json:"address"`
-	Birthday int    `json:"birthday"`
+type User struct {
+	Id   int       `json:"id"`
+	Name string    `json:"name"`
+	Car  string    `json:"car"`
+	Buy  time.Time `json:"buy"`
 }
 
-var person = []Person{
-	{Name: "Medet", Address: "Almaty", Birthday: 2024},
-	{Name: "Someone", Address: "Astana", Birthday: 2022},
+var db *sql.DB
+
+func mainP(c *gin.Context) {
+	rows, err := db.Query("SELECT * FROM public.forsedb")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"msg": "Error when selecting from table", "error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	var u User
+	users := []User{}
+	for rows.Next() {
+		err = rows.Scan(&u.Id, &u.Name, &u.Car, &u.Buy)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"msg": "Error when scanning from select", "error": err.Error()})
+			return
+		}
+		users = append(users, u)
+	}
+	if rows.Err() != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"msg": "Error after scanning from select", "error": rows.Err().Error()})
+		return
+	}
+	c.IndentedJSON(http.StatusOK, users)
+}
+
+func createP(c *gin.Context) {
+	var newUser User
+
+	err := c.BindJSON(&newUser)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"msg": "Error binding newperson", "error": err.Error()})
+		return
+	}
+
+	_, err = db.Exec("INSERT INTO public.forsedb (name, car, buy) VALUES ($1, $2, $3)", newUser.Name, newUser.Car, newUser.Buy)
+	if err != nil {
+		log.Println("Database insert error:", err)
+		c.JSON(http.StatusBadRequest, gin.H{"msg": "Error inserting values", "error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"msg": "User added successfully"})
 }
 
 func main() {
-	route := gin.Default()
-	route.GET("/testing", startPage)
-	route.GET("/testing/:name", findPage)
-	route.DELETE("/testing/:name", deletePage)
-	route.POST("/testing", postPage)
-	route.PUT("/testing/:address", updatePage)
-	route.Run(":8085")
-}
-
-func startPage(c *gin.Context) {
-	c.IndentedJSON(http.StatusOK, person)
-}
-
-func postPage(c *gin.Context) {
-	var newPerson Person
-
-	err := c.BindJSON(&newPerson)
+	conn := "user=postgres password=meda13 dbname=forsedb sslmode=disable"
+	var err error
+	db, err = sql.Open("postgres", conn)
 	if err != nil {
-		return
+		log.Fatal(err, "Error when connecting with database")
 	}
-	person = append(person, newPerson)
-	c.IndentedJSON(http.StatusCreated, newPerson)
-}
 
-func findPage(c *gin.Context) {
-	addr := c.Param("name")
-
-	for _, el := range person {
-		if el.Name == addr {
-			c.IndentedJSON(http.StatusOK, el)
-			return
-		}
+	err = db.Ping()
+	if err != nil {
+		log.Fatal("No database connection:", err)
 	}
-	c.IndentedJSON(http.StatusNotFound, gin.H{"msg": "Your input name not eq for element in slice person when finding"})
-}
 
-func deletePage(c *gin.Context) {
-	name := c.Param("name")
+	defer db.Close()
 
-	for i := range person {
-		if person[i].Name == name {
-			person = append(person[:i], person[i+1:]...)
-			c.Status(http.StatusNoContent)
-			return
-		}
-	}
-	c.IndentedJSON(http.StatusNotFound, gin.H{"msg": "Your input name not eq for element in slice person when delete"})
-}
+	route := gin.Default()
 
-func updatePage(c *gin.Context) {
-	address := c.Param("address")
-
-	for i := range person {
-		if person[i].Address == address {
-			if err := c.BindJSON(&person[i]); err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-				return
-			}
-			c.IndentedJSON(http.StatusOK, person[i])
-			return
-		}
-	}
-	c.IndentedJSON(http.StatusNotFound, gin.H{"msg": "Your input address not eq for element in slice person when update"})
+	route.GET("/main", mainP)
+	route.POST("/main/create", createP)
+	route.Run(":8088")
 }
