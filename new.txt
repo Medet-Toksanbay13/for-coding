@@ -1,9 +1,9 @@
-curl -X DELETE http://localhost:8085/testing/egoist --include --header "Content-Type: application/json"
+curl -X DELETE http://localhost:8088/main/2 --include --header "Content-Type: application/json"
 
-curl http://localhost:8088/main/create --include --header "Content-Type: application/json" --request "POST" --data "{\"name\": \"Meda\", \"car\": \"Porshe\", \"buy\": \"2004-11-13T11:13:37Z\"}"
+curl http://localhost:8088/main/create --include --header "Content-Type: application/json" --request "POST" --data "{\"id\": 2, \"name\": \"Meda\", \"car\": \"Toyota\", \"buy\": \"2003-03-17T11:13:37Z\"}"
 
 
-curl -X PUT http://localhost:8085/testing/Almaty --include --header "Content-Type: application/json" --data "{\"name\": \"names\", \"address\": \"gorods\"}"
+curl -X PUT http://localhost:8088/main/1 --include --header "Content-Type: application/json" --data "{\"name\": \"Toksanbay\", \"car\": \"Ford\", \"buy\": \"1999-03-17T11:13:37Z\"}"
 
 
 
